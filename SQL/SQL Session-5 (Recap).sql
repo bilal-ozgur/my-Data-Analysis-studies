@@ -1,4 +1,4 @@
-
+﻿
 -- SQL Session-6, RECAP, 12.07.2023
 --------------------------------------------
 
@@ -102,3 +102,46 @@ FROM sale.staff AS a
 	JOIN sale.order_item AS c ON b.order_id = c.order_id
 WHERE order_date LIKE '2020-04-%'
 GROUP BY a.first_name, a.last_name,DATEPART(ISOWK, order_date);
+
+------------------------
+--difference between week and isoweek
+
+select datepart(w, '2018-01-01')
+select datepart(isowk, '2018-01-01')
+select datename(dw, '2018-01-01')
+
+
+----------------------------------------------------------
+--JOINs
+
+SELECT * FROM product.stock
+
+SELECT a.product_id, b.store_id, ISNULL(c.quantity,0) quantity --COALESCE
+FROM product.product a
+	CROSS JOIN sale.store b
+	LEFT JOIN product.stock c ON a.product_id=c.product_id
+	AND b.store_id=c.store_id
+ORDER BY 1,2;
+
+
+--------------------------------------------
+--COALESCE vs. ISNULL
+
+SELECT ISNULL(phone, 0)
+FROM sale.customer
+
+
+SELECT COALESCE(phone, 0)
+FROM sale.customer   --GIVES ERROR
+
+SELECT 1 + '1' --implicit conversion
+
+
+--NULLIF
+--zero division hatalarýný engellemek için kullanýlýr
+
+SELECT NULLIF(1, '1')
+
+SELECT 1/0
+
+SELECT 1/NULLIF(points,0)
