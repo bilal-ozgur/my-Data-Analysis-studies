@@ -64,7 +64,7 @@ WHERE list_price > (SELECT list_price
 SELECT *
 FROM sale.orders
 WHERE order_date = (SELECT order_date
-				    FROM sale.customer
+				    FROM sale.customer  --JOIN OLARAK ORDER TABLOSU OLMASI LAIZM
                     WHERE first_name+last_name = 'LaurelGoldammer')
 ---YUKARIDA PARANTEZ ICI CALISMAZKEN QUERYNIN TAMAMI NASIL CALISIYOR ANLAMIS DEGILIM
 
@@ -275,7 +275,7 @@ WHERE list_price > (SELECT AVG(list_price) FROM product.product WHERE category_i
 --List the products whose list price is higher than the average price of the products in the category.(Same question above but use CTE) 
 
 ---HOCAYA SORULACAK---
-WITH temp_table AS
+WITH temp_table AS --CATEGORYLERIDE EKLE
 	(SELECT AVG(list_price) AS avg_salary
 	FROM product.product)
 	SELECT product_id, product_name, list_price
@@ -294,6 +294,16 @@ WITH cte AS
 SELECT a.customer_id, first_name, last_name, city, order_date, max_date
 FROM sale.customer AS a, sale.orders AS b, cte
 WHERE a.customer_id=b.customer_id
+
+
+----alttaki tabloyu dene
+SELECT a.customer_id, first_name, last_name, city, order_date, max_date
+FROM sale.customer AS a, sale.orders AS b,(SELECT MAX(order_date) AS max_date
+		FROM sale.customer AS a
+			JOIN sale.orders AS b ON a.customer_id = b.customer_id
+		WHERE first_name + last_name = 'JeraldBerray') AS tablo
+WHERE a.customer_id=b.customer_id AND --TABLOYU BURAYA JOINLE
+
 
 ----SORUM---USTTE KI BIRLESTIRILEN QUERYIM NEDEN ALTTAKIYLE JOIN METODUYLA BIRLESMEDI??
 WITH cte AS
