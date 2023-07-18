@@ -40,10 +40,6 @@ WHERE manager_id = (SELECT staff_id
 					FROM sale.staff
 					WHERE first_name + last_name = 'CharlesCussona')
 
--- Subquerry'de neden staff_id yazdik? Soruda eger Charless Cussona yerine staff_id'si 2 olmayan yani staff_idsi farkli biri olsaydi bu sefer sonuc farkli cikacakti?
-
-
-
 
 --QUESTION: Write a query that returns the list of products that are more expensive than the product
 --named 'Pro-Series 49-Class Full HD Outdoor LED TV (Silver)'.(Also show model year and list price)
@@ -68,8 +64,10 @@ WHERE list_price > (SELECT list_price
 SELECT *
 FROM sale.orders
 WHERE order_date = (SELECT order_date
-				     FROM sale.orders
-                     WHERE first_name+last_name = 'LaurelGoldammer')
+				    FROM sale.customer
+                    WHERE first_name+last_name = 'LaurelGoldammer')
+---YUKARIDA PARANTEZ ICI CALISMAZKEN QUERYNIN TAMAMI NASIL CALISIYOR ANLAMIS DEGILIM
+
 
 SELECT b.order_date
 FROM sale.customer AS a
@@ -83,6 +81,7 @@ WHERE order_date IN (SELECT b.order_date
 			FROM sale.customer AS a
 				  JOIN sale.orders AS b ON a.customer_id = b.customer_id
 			WHERE first_name+last_name = 'LaurelGoldammer')
+
 
 --QUESTION: List the products that ordered in the last 10 orders in Buffalo city.
 
@@ -125,6 +124,7 @@ FROM product.product AS a
 	      GROUP BY category_id) AS b
      ON a.category_id = b.category_id
 ORDER BY 1;
+
 
 -------SOLUTION 2 -- WITH CORRALATED SUBQUERY
 
@@ -274,6 +274,7 @@ WHERE list_price > (SELECT AVG(list_price) FROM product.product WHERE category_i
 
 --List the products whose list price is higher than the average price of the products in the category.(Same question above but use CTE) 
 
+---HOCAYA SORULACAK---
 WITH temp_table AS
 	(SELECT AVG(list_price) AS avg_salary
 	FROM product.product)
