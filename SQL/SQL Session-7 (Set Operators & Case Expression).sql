@@ -366,3 +366,7 @@ WHERE
 
 ----SOLUTION WITH GROUP BY:
 
+SELECT DATENAME(WEEKDAY, order_date) AS day_of_week, COUNT(*) [count]
+FROM sale.orders
+WHERE DATEDIFF(DAY,order_date, shipped_date) > 2
+GROUP BY DATENAME(WEEKDAY, order_date);
