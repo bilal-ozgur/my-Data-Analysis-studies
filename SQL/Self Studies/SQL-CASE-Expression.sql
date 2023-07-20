@@ -30,3 +30,7 @@ Count_of_orders, first_name
 
 -- 2-) List counts of orders on the weekend and weekdays. Submit your answer in a single row with two columns. For example: 164 161. First value is for weekend.
 
+SELECT  
+	SUM(CASE WHEN DATENAME(DW, order_date) IN ('Sunday','Saturday') THEN 1 ELSE 0 END) AS Weekend,
+	SUM(CASE WHEN DATENAME(DW, order_date) NOT IN ('Sunday','Saturday') THEN 1 ELSE 0 END) AS Weekday
+FROM sale.orders
