@@ -185,6 +185,22 @@ WHERE brand_id IN (
 	FROM product.product
 	WHERE model_year = '2019'
 );
+--------------------
+--SOLUTION WITH CTE
+
+WITH t1 AS
+(
+	SELECT brand_id
+	FROM product.product
+	WHERE model_year = '2018'
+	EXCEPT
+	SELECT brand_id
+	FROM product.product
+	WHERE model_year = '2019'
+)
+SELECT t1.brand_id, brand_name
+FROM product.brand AS b, t1
+WHERE b.brand_id = t1.brand_id;
 
 
 
@@ -193,10 +209,25 @@ WHERE brand_id IN (
 
 
 
-
-
-
-
+SELECT c.product_id, product_name
+FROM 
+	sale.orders AS a,
+	sale.order_item AS b,
+	product.product AS c
+WHERE 
+	a.order_id = b.order_id
+	AND b.product_id = c.product_id
+	AND YEAR(order_date) = 2019
+EXCEPT
+SELECT c.product_id, product_name
+FROM 
+	sale.orders AS a,
+	sale.order_item AS b,
+	product.product AS c
+WHERE 
+	a.order_id = b.order_id
+	AND b.product_id = c.product_id
+	AND YEAR(order_date) <> 2019;
 
 
 ---///////////////////////////////////////////////////////////////////////
@@ -212,12 +243,14 @@ WHERE brand_id IN (
 
 ---1 = Pending; 2 = Processing; 3 = Rejected; 4 = Completed
 
-
-
-
-
-
-
+SELECT *,
+	CASE order_status
+		WHEN 4 THEN 'Completed'
+		WHEN 3 THEN 'Rejected'
+		WHEN 2 THEN 'Processing'
+		WHEN 1 THEN 'Pending'
+	END AS order_status_desc
+FROM sale.orders;
 
 
 ---Searched Case Expression-------------------------------------------------
@@ -228,34 +261,108 @@ WHERE brand_id IN (
 ---1 = Pending; 2 = Processing; 3 = Rejected; 4 = Completed
 
 
-
-
-
-
-
+SELECT *,
+	CASE 
+		WHEN order_status=4 THEN 'Completed'
+		WHEN order_status=3 THEN 'Rejected'
+		WHEN order_status=2 THEN 'Processing'
+		WHEN order_status=1 THEN 'Pending'
+	END AS order_status_desc
+FROM sale.orders;
 
 
 ---QUESTION: Create a new column that shows which email service provider ("Gmail", "Hotmail", "Yahoo" or "Other" ).
 ---(Müþterilerin e-mail adreslerindeki servis saðlayýcýlarýný yeni bir sütun oluþturarak belirtiniz)
 
+SELECT first_name, last_name, email,
+	CASE
+		WHEN email LIKE '%gmail%' THEN 'Gmail'
+		WHEN email LIKE '%Hotmail%' THEN 'Hotmail'
+		WHEN email LIKE '%Yahoo%' THEN 'Yahoo'
+		WHEN email IS NOT NULL THEN 'Other'
+		ELSE NULL
+	END AS 'email_service_provider'
+FROM sale.customer;
 
+--------SOLUTION WITH GROUP BY;
 
-
-
-
+SELECT COUNT(customer_id)
+FROM sale.customer
+GROUP BY
+	CASE
+		WHEN email LIKE '%gmail%' THEN 'Gmail'
+		WHEN email LIKE '%Hotmail%' THEN 'Hotmail'
+		WHEN email LIKE '%Yahoo%' THEN 'Yahoo'
+		WHEN email IS NOT NULL THEN 'Other'
+		ELSE NULL
+	END;
 
 
 
 ---QUESTION: Write a query that gives the first and last names of customers who have ordered products from the computer accessories, speakers, and mp4 player categories in the same order.
 
+WITH cte AS 
+(
+	SELECT a.customer_id, first_name, last_name, b.order_id,
+		SUM(CASE WHEN category_name = 'Computer Accessories' THEN 1 ELSE 0 END) AS ca,
+		SUM(CASE WHEN category_name = 'Speakers' THEN 1 ELSE 0 END) AS sp,
+		SUM(CASE WHEN category_name = 'mp4 player' THEN 1 ELSE 0 END) AS mp4
+	FROM 
+		sale.customer AS a,
+		sale.orders AS b,
+		sale.order_item AS c,
+		product.product AS d,
+		product.category AS e
+	WHERE 
+		a.customer_id = b.customer_id 
+		AND b.order_id = c.order_id
+		AND c.product_id = d.product_id
+		AND d.category_id = e.category_id
+	GROUP BY a.customer_id, first_name, last_name, b.order_id
+)
+SELECT *
+FROM cte
+WHERE ca > 0 AND sp > 0 AND mp4 > 0;
 
+---------------------------
+--SOLUTION WITH SUBQUERY:
 
-
-
-
-
+SELECT *
+FROM (
+	SELECT a.customer_id, first_name, last_name, b.order_id,
+		SUM(CASE WHEN category_name = 'Computer Accessories' THEN 1 ELSE 0 END) AS ca,
+		SUM(CASE WHEN category_name = 'Speakers' THEN 1 ELSE 0 END) AS sp,
+		SUM(CASE WHEN category_name = 'mp4 player' THEN 1 ELSE 0 END) AS mp4
+	FROM 
+		sale.customer AS a,
+		sale.orders AS b,
+		sale.order_item AS c,
+		product.product AS d,
+		product.category AS e
+	WHERE 
+		a.customer_id = b.customer_id 
+		AND b.order_id = c.order_id
+		AND c.product_id = d.product_id
+		AND d.category_id = e.category_id
+	GROUP BY a.customer_id, first_name, last_name, b.order_id ) AS subquery
+WHERE ca > 0 AND sp > 0 AND mp4 > 0;
 
 
 ---QUESTION: Write a query that returns the count of the orders day by day in a pivot table format that has been shipped two days later.
 ---(2 günden geç kargolanan sipariþlerin haftanýn günlerine göre daðýlýmýný hesaplayýnýz)
+
+SELECT 
+	SUM(CASE WHEN DATENAME(DW, order_date) = 'Monday' THEN 1 ELSE 0 END) AS Monday,
+	SUM(CASE WHEN DATENAME(DW, order_date) = 'Tuesday' THEN 1 ELSE 0 END) AS Tuesday,
+	SUM(CASE WHEN DATENAME(DW, order_date) = 'Wednesday' THEN 1 ELSE 0 END) AS Wednesday,
+	SUM(CASE WHEN DATENAME(DW, order_date) = 'Thursday' THEN 1 ELSE 0 END) AS Thursday,
+	SUM(CASE WHEN DATENAME(DW, order_date) = 'Friday' THEN 1 ELSE 0 END) AS Friday,
+	SUM(CASE WHEN DATENAME(DW, order_date) = 'Saturday' THEN 1 ELSE 0 END) AS Saturday,
+	SUM(CASE WHEN DATENAME(DW, order_date) = 'Sunday' THEN 1 ELSE 0 END) AS Sunday
+FROM 
+	sale.orders
+WHERE 
+	DATEDIFF(DAY, order_date, shipped_date) > 2;
+
+----SOLUTION WITH GROUP BY:
 
