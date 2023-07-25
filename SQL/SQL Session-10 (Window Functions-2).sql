@@ -1,4 +1,4 @@
---SQL SESSION-10 (Window Functions-2)
+ï»¿--SQL SESSION-10 (Window Functions-2)
 
 --*** Windowed functions can only appear in the SELECT or ORDER BY clauses.
 
@@ -14,7 +14,7 @@
 --/////////////////////////////////////
 
 --QUESTION: Assign an ordinal number to the product prices for each category in ascending order.
---(Herbir kategori içinde ürünlerin fiyat sýralamasýný yapýnýz - artan fiyata göre 1'den baþlayýp birer birer artacak)
+--(Herbir kategori iÃ§inde Ã¼rÃ¼nlerin fiyat sÄ±ralamasÄ±nÄ± yapÄ±nÄ±z - artan fiyata gÃ¶re 1'den baÅŸlayÄ±p birer birer artacak)
 
 
 SELECT	category_id,
@@ -37,7 +37,7 @@ FROM	product.product;
 --/////////////////////////////////////
 
 --QUESTION: Which orders' average product price is lower than the overall average price?
---(Hange sipariþlerin ortalama ürün fiyatý genel ortalama fiyattan daha düþüktür?)
+--(Hange sipariÅŸlerin ortalama Ã¼rÃ¼n fiyatÄ± genel ortalama fiyattan daha dÃ¼ÅŸÃ¼ktÃ¼r?)
 
 SELECT	*
 FROM	(
@@ -65,7 +65,7 @@ ORDER BY avg_price_by_orders DESC;
 --/////////////////////////////////////
 
 --QUESTION: Calculate the stores' weekly cumulative count of orders for 2018.
---(maðazalarýn 2018 yýlýna ait haftalýk kümülatif sipariþ sayýlarýný hesaplayýnýz)
+--(maÄŸazalarÄ±n 2018 yÄ±lÄ±na ait haftalÄ±k kÃ¼mÃ¼latif sipariÅŸ sayÄ±larÄ±nÄ± hesaplayÄ±nÄ±z)
 
 SELECT	DISTINCT 
 		a.store_id,
@@ -83,7 +83,7 @@ WHERE	a.store_id = b.store_id
 --/////////////////////////////////////
 
 --QUESTION: Calculate 7-day moving average of the number of products sold between '2018-03-12' and '2018-04-12'.
---('2018-03-12' ve '2018-04-12' arasýnda satýlan ürün sayýsýnýn 7 günlük hareketli ortalamasýný hesaplayýn)
+--('2018-03-12' ve '2018-04-12' arasÄ±nda satÄ±lan Ã¼rÃ¼n sayÄ±sÄ±nÄ±n 7 gÃ¼nlÃ¼k hareketli ortalamasÄ±nÄ± hesaplayÄ±n)
 
 
 WITH cte AS(
@@ -117,7 +117,7 @@ GROUP BY a.order_date;
 --/////////////////////////////////////
 
 --QUESTION: Write a query that returns the highest daily turnover amount for each week on a yearly basis.
---(Yýl bazýnda her haftaya ait en yüksek günlük ciro miktarýný döndüren bir sorgu yazýnýz)
+--(YÄ±l bazÄ±nda her haftaya ait en yÃ¼ksek gÃ¼nlÃ¼k ciro miktarÄ±nÄ± dÃ¶ndÃ¼ren bir sorgu yazÄ±nÄ±z)
 
 SELECT	DISTINCT
 		order_year, order_week,
@@ -154,32 +154,65 @@ GROUP BY order_date
 --/////////////////////////////////////
 
 --QUESTION: List customers whose have at least 2 consecutive orders are not shipped.
---(Peþpeþe en az 2 sipariþi gönderilmeyen müþterileri bulunuz)
+--(PeÅŸpeÅŸe en az 2 sipariÅŸi gÃ¶nderilmeyen mÃ¼ÅŸterileri bulunuz)
 
 
+--SOLUTION 1--
 SELECT	customer_id
 FROM	(
 		SELECT	order_id, customer_id, order_date, shipped_date,
 				LEAD(shipped_date, 1, '0001-01-01') OVER(PARTITION BY customer_id ORDER BY order_date) AS next_shipped_date
 		FROM	sale.orders
 		) AS subq
-WHERE	(shipped_date IS NULL AND next_shipped_date IS NULL)
+WHERE	(shipped_date IS NULL AND next_shipped_date IS NULL);
 
+
+-------
+--SOLUTION 2--
+WITH t1 AS(
+	SELECT	customer_id, order_id,
+			CASE WHEN shipped_date IS NULL THEN 'not delivered' ELSE 'delivered' END AS delivery_status
+	FROM	sale.orders
+), t2 AS(
+	SELECT	*,
+			LEAD(delivery_status) OVER(PARTITION BY customer_id ORDER BY order_id) AS next_order_delivery_status
+	FROM	t1
+)
+SELECT	customer_id
+FROM	t2
+WHERE	delivery_status='not delivered' AND next_order_delivery_status='not delivered';
+
+
+--SOLUTION 3--
+--WITH CASE IN LEAD WITHOUT USING CTEs
+
+
+SELECT	customer_id
+FROM	(
+	SELECT	*,
+			CASE WHEN shipped_date IS NULL THEN 'not delivered' ELSE 'delivered' END AS delivery_status,
+			LEAD(CASE WHEN shipped_date IS NULL THEN 'not delivered' ELSE 'delivered' END) OVER(PARTITION BY customer_id ORDER BY order_id) AS next_order_delivery_status
+	FROM	sale.orders
+		) AS subq
+WHERE	delivery_status='not delivered' AND next_order_delivery_status='not delivered';
 
 
 --/////////////////////////////////////
 
 --QUESTION: Write a query that returns how many days are between the third and fourth order dates of each staff.
---(Her bir personelin üçüncü ve dördüncü sipariþleri arasýndaki gün farkýný bulunuz)
+--(Her bir personelin Ã¼Ã§Ã¼ncÃ¼ ve dÃ¶rdÃ¼ncÃ¼ sipariÅŸleri arasÄ±ndaki gÃ¼n farkÄ±nÄ± bulunuz)
 
 
-
-
-
-
-
-
-
+SELECT	subq.staff_id, first_name, last_name, order_date, previous_order,
+		DATEDIFF(DAY,  previous_order, order_date) AS date_diff
+FROM	(
+		SELECT	*,
+				ROW_NUMBER() OVER(PARTITION BY staff_id ORDER BY order_id) AS orders_rows,
+				LAG(order_date) OVER(PARTITION BY staff_id ORDER BY order_id) AS previous_order
+		FROM	sale.orders
+		) AS subq
+INNER JOIN sale.staff AS b ON subq.staff_id = b.staff_id
+WHERE	orders_rows = 4;
 
 
 
@@ -196,14 +229,12 @@ WHERE	(shipped_date IS NULL AND next_shipped_date IS NULL)
 --////////////////////////
 
 --QUESTION: Write a query that returns the cumulative distribution of the list price in product table by brand.
---(product tablosundaki list price' larýn kümülatif daðýlýmýný marka kýrýlýmýnda hesaplayýnýz)
+--(product tablosundaki list price' larÄ±n kÃ¼mÃ¼latif daÄŸÄ±lÄ±mÄ±nÄ± marka kÄ±rÄ±lÄ±mÄ±nda hesaplayÄ±nÄ±z)
 
 
-
-
-
-
-
+SELECT	brand_id, list_price,
+		CUME_DIST() OVER(PARTITION BY brand_id ORDER BY list_price) AS cume_dist
+FROM	product.product;
 
 
 
@@ -219,10 +250,9 @@ WHERE	(shipped_date IS NULL AND next_shipped_date IS NULL)
 --QUESTION: Write a query that returns the relative standing of the list price in the product table by brand.
 
 
-
-
-
-
+SELECT	brand_id, list_price,
+		FORMAT(ROUND(PERCENT_RANK() OVER(PARTITION BY brand_id ORDER BY list_price), 3 ),'p') AS percent_rank
+FROM	product.product;
 
 
 
@@ -235,5 +265,34 @@ WHERE	(shipped_date IS NULL AND next_shipped_date IS NULL)
 
 --////////////////////////
 
+SELECT	list_price,
+		NTILE(5) OVER(ORDER BY list_price) AS [ntile]
+FROM	product.product;
 
 
+-------------------------------------------------------------------
+--EXTRA:
+
+--use of FORMAT function
+
+SELECT	FORMAT(list_price, 'c') AS list_price
+FROM	product.product;
+
+
+SELECT	FORMAT(GETDATE(), 'D') AS "date";
+
+SELECT	FORMAT(GETDATE(), 'd') AS "date";
+
+-------------------------------------------------------------------
+
+SELECT	*
+FROM	sale.customer
+WHERE	first_name LIKE N'%an%';
+
+SELECT	'yaÄŸÄ±z';
+
+SELECT	N'yaÄŸÄ±z';
+
+SELECT	'ðŸ˜€';
+
+SELECT	N'ðŸ˜€';
