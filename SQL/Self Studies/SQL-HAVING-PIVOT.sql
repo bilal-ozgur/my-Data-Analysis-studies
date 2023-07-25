@@ -1,30 +1,13 @@
 --CHECK YOURSELF- 17
 --SORU 1--
 
-SELECT	order_id,
-		AVG(quantity * list_price * (1 - discount)) AS avg_amount
+
+SELECT	order_id
+		--AVG(quantity * list_price ) AS avg_amount
 FROM	sale.order_item
 GROUP BY order_id
-HAVING	AVG(quantity * list_price * (1 - discount)) > 2000
+HAVING	AVG(quantity * list_price ) > 2000
 ORDER BY 1
-
-
-SELECT *
-FROM
-(
-	SELECT	order_id,
-			AVG(quantity * list_price * (1 - discount)) AS avg_amount
-	FROM	sale.order_item
-	GROUP BY order_id
-	HAVING	AVG(quantity * list_price * (1 - discount)) > 2000
-) AS subq
-WHERE avg_amount > 2000
-
-
-SELECT *
-FROM sale.order_item
-ORDER BY 1
-
 
 --SORU 2--
 
