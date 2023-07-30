@@ -1,3 +1,21 @@
+--Before starting let's convert our ID columns into the numeric values
+
+UPDATE [dbo].e_commerce_data
+SET Ord_ID = SUBSTRING(Ord_ID, CHARINDEX('_', Ord_ID) + 1 , LEN(Ord_ID)),
+	Cust_ID = SUBSTRING(Cust_ID, CHARINDEX('_', Cust_ID) + 1 , LEN(Cust_ID)),
+	Prod_ID = SUBSTRING(Prod_ID, CHARINDEX('_', Prod_ID) + 1 , LEN(Prod_ID)),
+	Ship_ID = SUBSTRING(Ship_ID, CHARINDEX('_', Ship_ID) + 1 , LEN(Ship_ID));
+
+
+ALTER TABLE e_commerce_data ALTER COLUMN Ord_ID INT
+ALTER TABLE e_commerce_data ALTER COLUMN Cust_ID INT
+ALTER TABLE e_commerce_data ALTER COLUMN Prod_ID INT
+ALTER TABLE e_commerce_data ALTER COLUMN Ship_ID INT
+
+ALTER TABLE e_commerce_data ALTER COLUMN Order_Date DATE
+ALTER TABLE e_commerce_data ALTER COLUMN Ship_Date DATE
+
+
 -- 1. Find the top 3 customers who have the maximum count of orders.
 
   SELECT	Cust_ID, SUM(Order_Quantity) AS total_qty_order
@@ -66,7 +84,7 @@ ORDER BY Cust_ID;
 SELECT		Cust_ID, 
 			SUM(Order_Quantity) AS sum_of_quantity			
 FROM		e_commerce_data
-WHERE		Prod_ID IN ('Prod_14','Prod_11')
+WHERE		Prod_ID IN ('14','11')
 GROUP BY	Cust_ID
 HAVING		COUNT(DISTINCT Prod_ID) = 2;
 
@@ -76,7 +94,7 @@ WITH t1 AS (
 			SELECT		Cust_ID
 						,SUM(Order_Quantity) AS sum_of_quantity			
 			FROM		e_commerce_data
-			WHERE		Prod_ID IN ('Prod_14','Prod_11')
+			WHERE		Prod_ID IN ('14','11')
 			GROUP BY	Cust_ID
 			HAVING		COUNT(DISTINCT Prod_ID) = 2		
 			)
@@ -87,3 +105,79 @@ SELECT	DISTINCT
 FROM	t1 AS a,
 		e_commerce_data AS B
 WHERE	a.Cust_ID = b.Cust_ID;
+
+
+
+
+-- Customer Segmentation
+-- Categorize customers based on their frequency of visits. The following steps will guide you. If you want, you can track your own way.
+
+
+-- 1. Create a “view” that keeps visit logs of customers on a monthly basis. (For each log, three field is kept: Cust_id, Year, Month)
+
+--CREATE VIEW monthly_visit_log AS
+SELECT	Cust_ID,
+		YEAR(Order_Date) AS [year],
+		MONTH(Order_Date) AS [month]
+FROM	e_commerce_data;
+
+
+SELECT	*
+FROM	monthly_visit_log;
+
+
+-- 2. Create a “view” that keeps the number of monthly visits by users. (Show separately all months from the beginning business)
+
+--CREATE VIEW cnt_of_monthly_visits AS
+
+
+
+SELECT   YEAR(Order_Date) AS Years,
+		 DATENAME(MONTH, Order_Date) AS Months,
+		 COUNT(Ord_ID) AS cnt_of_orders
+FROM	 e_commerce_data
+GROUP BY YEAR(Order_Date),
+		 DATENAME(MONTH, Order_Date)
+ORDER BY YEAR(Order_Date),
+		 DATENAME(MONTH, Order_Date);
+
+
+
+
+SELECT   Cust_ID,
+		 YEAR(Order_Date) AS Years,
+		 DATENAME(MONTH, Order_Date) AS Months,
+		 COUNT(Ord_ID) AS cnt_of_orders
+FROM	 e_commerce_data
+GROUP BY Cust_ID,YEAR(Order_Date),
+		 DATENAME(MONTH, Order_Date)
+ORDER BY Cust_ID,YEAR(Order_Date),
+		 DATENAME(MONTH, Order_Date);
+
+
+WITH t1 AS (
+	SELECT	DISTINCT Cust_ID,
+			Ord_ID, 
+			Order_Date,
+			LEAD(Order_Date) OVER(PARTITION BY Cust_ID ORDER BY Order_Date ) AS next_month,
+			DATEDIFF(MONTH, Order_Date,LEAD(Order_Date) OVER(PARTITION BY Cust_ID ORDER BY Order_Date )) AS month_diff
+	FROM	e_commerce_data
+	--ORDER BY Cust_ID,
+			--Ord_ID,
+			--Order_Date;
+			)
+SELECT  *,
+		AVG(month_diff) OVER() AS avg_gaps
+FROM	t1
+
+
+
+
+
+
+SELECT  *
+FROM	e_commerce_data
+ORDER BY 1
+
+SELECT DISTINCT Ord_ID
+FROM e_commerce_data
