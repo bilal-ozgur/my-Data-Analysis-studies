@@ -90,6 +90,7 @@ HAVING		COUNT(DISTINCT Prod_ID) = 2;
 
 
 --Then, let's find ratio of these products to the total number of products purchased by the customer
+
 WITH t1 AS (
 			SELECT		Cust_ID
 						,SUM(Order_Quantity) AS sum_of_quantity			
@@ -101,7 +102,7 @@ WITH t1 AS (
 SELECT	DISTINCT 
 		a.Cust_ID, sum_of_quantity,
 		SUM(Order_Quantity) OVER(PARTITION BY b.Cust_ID) AS overall_quantity,
-		CAST(sum_of_quantity / SUM(Order_Quantity) OVER(PARTITION BY b.Cust_ID) AS decimal(3,2))  AS ratio 
+		FORMAT(sum_of_quantity / SUM(Order_Quantity) OVER(PARTITION BY b.Cust_ID), 'P', 'EN-US')  AS ratio 
 FROM	t1 AS a,
 		e_commerce_data AS B
 WHERE	a.Cust_ID = b.Cust_ID;
@@ -115,60 +116,121 @@ WHERE	a.Cust_ID = b.Cust_ID;
 
 -- 1. Create a “view” that keeps visit logs of customers on a monthly basis. (For each log, three field is kept: Cust_id, Year, Month)
 
---CREATE VIEW monthly_visit_log AS
-SELECT	Cust_ID,
+CREATE VIEW monthly_visit_log AS
+SELECT	DISTINCT Ord_ID,
+		Cust_ID,
 		YEAR(Order_Date) AS [year],
 		MONTH(Order_Date) AS [month]
 FROM	e_commerce_data;
 
-
+--Let's run this view
 SELECT	*
 FROM	monthly_visit_log;
 
 
+
+
 -- 2. Create a “view” that keeps the number of monthly visits by users. (Show separately all months from the beginning business)
 
---CREATE VIEW cnt_of_monthly_visits AS
+--Let's create view that returns number of monthly visits by users
 
-
-
+CREATE VIEW cnt_of_monthly_visits AS
 SELECT   YEAR(Order_Date) AS Years,
-		 DATENAME(MONTH, Order_Date) AS Months,
+		 MONTH(Order_Date) AS Months,
 		 COUNT(Ord_ID) AS cnt_of_orders
 FROM	 e_commerce_data
 GROUP BY YEAR(Order_Date),
-		 DATENAME(MONTH, Order_Date)
-ORDER BY YEAR(Order_Date),
-		 DATENAME(MONTH, Order_Date);
+		 MONTH(Order_Date);
+
+--Let's run our view:
+SELECT	*
+FROM	cnt_of_monthly_visits;
 
 
 
-
+--Let's create view that returns monthly count of visits by each users
+CREATE VIEW cnt_of_monthly_user_visits AS
 SELECT   Cust_ID,
 		 YEAR(Order_Date) AS Years,
-		 DATENAME(MONTH, Order_Date) AS Months,
+		 MONTH(Order_Date) AS Months,
 		 COUNT(Ord_ID) AS cnt_of_orders
 FROM	 e_commerce_data
 GROUP BY Cust_ID,YEAR(Order_Date),
-		 DATENAME(MONTH, Order_Date)
-ORDER BY Cust_ID,YEAR(Order_Date),
-		 DATENAME(MONTH, Order_Date);
+		 MONTH(Order_Date);
 
 
+--Let's run this view:
+SELECT	*
+FROM	cnt_of_monthly_user_visits;
+
+
+
+--3. For each visit of customers, create the next month of the visit as a separate column.
+
+SELECT	DISTINCT Ord_ID,
+		Cust_ID, 
+		Order_Date,
+		LEAD(Order_Date) OVER(PARTITION BY Cust_ID ORDER BY Order_Date ) AS next_month
+FROM   (SELECT	DISTINCT Ord_ID,
+				Cust_ID, 
+				Order_Date
+		FROM	e_commerce_data) AS subq
+
+
+--4. Calculate the monthly time gap between two consecutive visits by each customer.
+
+
+SELECT	DISTINCT Ord_ID,
+		Cust_ID, 
+		Order_Date,
+		LEAD(Order_Date) OVER(PARTITION BY Cust_ID ORDER BY Order_Date ) AS next_month,
+		DATEDIFF(MONTH, Order_Date,LEAD(Order_Date) OVER(PARTITION BY Cust_ID ORDER BY Order_Date )) AS month_diff
+FROM   (SELECT	DISTINCT Ord_ID,
+				Cust_ID, 
+				Order_Date
+		FROM	e_commerce_data) AS subq
+
+
+
+--5. Categorise customers using average time gaps. Choose the most fitted labeling model for you.
+
+--Let's create view that keeps customers' average time gaps
+
+CREATE VIEW customer_retention AS
 WITH t1 AS (
-	SELECT	DISTINCT Cust_ID,
-			Ord_ID, 
-			Order_Date,
-			LEAD(Order_Date) OVER(PARTITION BY Cust_ID ORDER BY Order_Date ) AS next_month,
-			DATEDIFF(MONTH, Order_Date,LEAD(Order_Date) OVER(PARTITION BY Cust_ID ORDER BY Order_Date )) AS month_diff
-	FROM	e_commerce_data
-	--ORDER BY Cust_ID,
-			--Ord_ID,
-			--Order_Date;
-			)
+SELECT	DISTINCT Ord_ID,
+		Cust_ID, 
+		Order_Date,
+		LEAD(Order_Date) OVER(PARTITION BY Cust_ID ORDER BY Order_Date ) AS next_month,
+		DATEDIFF(MONTH, Order_Date,LEAD(Order_Date) OVER(PARTITION BY Cust_ID ORDER BY Order_Date )) AS month_diff
+FROM   (SELECT	DISTINCT Ord_ID,
+				Cust_ID, 
+				Order_Date
+		FROM	e_commerce_data) AS subq
+		)
 SELECT  *,
+		AVG(month_diff) OVER(PARTITION BY Cust_ID) AS customers_avg_gaps,	
 		AVG(month_diff) OVER() AS avg_gaps
-FROM	t1
+FROM	t1;
+
+
+--Let's use this view and categorise customers' most fitted labeling model
+
+SELECT DISTINCT Cust_ID,
+	CASE 
+		WHEN customers_avg_gaps IS NULL THEN 'CHURN'
+		WHEN customers_avg_gaps > avg_gaps THEN 'NOT SATISFIED'
+		WHEN customers_avg_gaps < avg_gaps THEN 'SATISFIED'
+		WHEN customers_avg_gaps = 0 THEN 'REGULAR'
+		WHEN customers_avg_gaps = avg_gaps THEN 'AVERAGE'
+	END AS [status]
+FROM customer_retention
+ORDER BY 1;
+
+
+
+
+
 
 
 
@@ -181,3 +243,14 @@ ORDER BY 1
 
 SELECT DISTINCT Ord_ID
 FROM e_commerce_data
+
+
+
+
+
+
+
+
+--Month-Wise Retention Rate
+
+--Find month-by-month customer retention ratei since the start of the business.
