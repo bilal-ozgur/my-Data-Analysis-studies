@@ -232,25 +232,46 @@ ORDER BY 1;
 
 
 
-
-
-
-
-
-SELECT  *
-FROM	e_commerce_data
-ORDER BY 1
-
-SELECT DISTINCT Ord_ID
-FROM e_commerce_data
-
-
-
-
-
-
-
-
 --Month-Wise Retention Rate
 
---Find month-by-month customer retention ratei since the start of the business.
+--Find month-by-month customer retention rate since the start of the business.
+
+-- Month-Wise Retention Rate = 1.0 * Number of Customers Retained in The Current Month / Total Number of Customers in the Current Month
+
+
+--Let's find total Number of customers by months
+
+SELECT	YEAR(Order_Date) AS "Year",
+		MONTH(Order_Date) AS "Month",
+		COUNT(DISTINCT Cust_ID) AS cnt_customers
+FROM	e_commerce_data
+GROUP BY YEAR(Order_Date),
+		 MONTH(Order_Date);
+
+--Let's find number of Customers Retained in The Current Month
+
+--I am stuck here. No time :( 
+SELECT	*
+FROM	(
+		SELECT	YEAR(Order_Date) AS "Year",
+				MONTH(Order_Date) AS "Month",
+				COUNT(DISTINCT Cust_ID) AS retained_customers
+		FROM	e_commerce_data
+		GROUP BY YEAR(Order_Date),
+				 MONTH(Order_Date)
+		) as a
+PIVOT
+	(
+	COUNT(Cust_ID)
+	FOR "Month" IN ([1], [2], [3], [4],[5], [6], [7], [8],[9], [10], [11], [12])
+	) AS pivot_table
+
+
+--I am stuck here :( 
+
+
+SELECT	*
+FROM	e_commerce_data
+
+
+
