@@ -1,9 +1,4 @@
 
--- DENEME -DENEME - DENEME - DENEME
--- DENEME -DENEME - DENEME - DENEME
--- DENEME -DENEME - DENEME - DENEME
-
-
 --Before starting let's convert our ID columns into the numeric values
 
 UPDATE [dbo].e_commerce_data
