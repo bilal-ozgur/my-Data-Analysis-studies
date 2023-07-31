@@ -252,6 +252,7 @@ GROUP BY YEAR(Order_Date),
 --Let's find number of Customers Retained in The Current Month
 
 --I am stuck here. No time :( 
+--Süre icerisinde bitrebildigim bu kadari. Projeyi yapmaya devam edeceim. projenin guncel halini paylasmis oldugum github linkinde bulabilirsiniz.
 SELECT	*
 FROM	(
 		SELECT	YEAR(Order_Date) AS "Year",
