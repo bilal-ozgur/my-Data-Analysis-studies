@@ -19,19 +19,18 @@ ALTER TABLE e_commerce_data ALTER COLUMN Ship_Date DATE
 
 -- 1. Find the top 3 customers who have the maximum count of orders.
 
-  SELECT	Cust_ID, SUM(Order_Quantity) AS total_qty_order
-  FROM		e_commerce_data
-  GROUP BY	Cust_ID
-  ORDER BY	total_qty_order DESC;
-
+SELECT	    TOP 3 Cust_ID, COUNT(DISTINCT Ord_ID) AS num_of_orders
+FROM		e_commerce_data
+GROUP BY	Cust_ID
+ORDER BY	num_of_orders DESC;
 
 
 
   -- 2. Find the customer whose order took the maximum time to get shipping.
 
-  SELECT    TOP 1 Cust_ID, Customer_Name, Province, Region,  Order_Date, Ship_Date, DaysTakenForShipping
-  FROM		e_commerce_data
-  ORDER BY	DaysTakenForShipping DESC;
+SELECT		TOP 1 Cust_ID, Customer_Name, Province, Region,  Order_Date, Ship_Date, DaysTakenForShipping
+FROM		e_commerce_data
+ORDER BY	DaysTakenForShipping DESC;
 
 
 
@@ -42,7 +41,8 @@ ALTER TABLE e_commerce_data ALTER COLUMN Ship_Date DATE
 
 SELECT	DISTINCT Cust_ID
 FROM	e_commerce_data
-WHERE	MONTH(Order_Date) = 1;
+WHERE	MONTH(Order_Date) = 1 AND
+		YEAR(Order_Date) = 2011;
 
 --Second, let's find how many of these customers came back month by month in 2011;
 
@@ -65,12 +65,12 @@ GROUP BY
 
 -- First, let's find customers, their orders and their previous orders
 
-SELECT  Cust_ID, Order_Date, first_ord_date,
+SELECT  DISTINCT Cust_ID, Order_Date, first_ord_date,
 		DATEDIFF(DAY, first_ord_date, Order_Date) AS day_diff
 FROM	(
 		SELECT	Ord_ID, Cust_ID, Order_Date,
-				ROW_NUMBER() OVER(PARTITION BY Cust_ID ORDER BY Order_Date) AS orders_rows,
-				MIN(Order_Date) OVER(PARTITION BY Cust_ID ORDER BY Order_Date) AS first_ord_date
+				DENSE_RANK() OVER(PARTITION BY Cust_ID ORDER BY Order_Date, Ord_ID) AS orders_rows,
+				MIN(Order_Date) OVER(PARTITION BY Cust_ID) AS first_ord_date
 		FROM	e_commerce_data
 		) AS subq
 WHERE	orders_rows = 3
@@ -92,6 +92,7 @@ HAVING		COUNT(DISTINCT Prod_ID) = 2;
 
 --Then, let's find ratio of these products to the total number of products purchased by the customer
 
+-- SOLUTION 1 --
 WITH t1 AS (
 			SELECT		Cust_ID
 						,SUM(Order_Quantity) AS sum_of_quantity			
@@ -118,8 +119,7 @@ WHERE	a.Cust_ID = b.Cust_ID;
 -- 1. Create a “view” that keeps visit logs of customers on a monthly basis. (For each log, three field is kept: Cust_id, Year, Month)
 
 CREATE VIEW monthly_visit_log AS
-SELECT	DISTINCT Ord_ID,
-		Cust_ID,
+SELECT	Cust_ID,
 		YEAR(Order_Date) AS [year],
 		MONTH(Order_Date) AS [month]
 FROM	e_commerce_data;
@@ -135,38 +135,33 @@ FROM	monthly_visit_log;
 
 --Let's create view that returns number of monthly visits by users
 
-CREATE VIEW cnt_of_monthly_visits AS
-SELECT   YEAR(Order_Date) AS Years,
+CREATE VIEW visit_logs AS
+SELECT   Cust_ID,
+		 YEAR(Order_Date) AS Years,
 		 MONTH(Order_Date) AS Months,
-		 COUNT(Ord_ID) AS cnt_of_orders
+		 COUNT(DISTINCT Ord_ID) AS cnt_of_orders
 FROM	 e_commerce_data
-GROUP BY YEAR(Order_Date),
+GROUP BY Cust_ID,
+		 YEAR(Order_Date),
 		 MONTH(Order_Date);
 
 --Let's run our view:
 SELECT	*
-FROM	cnt_of_monthly_visits;
+FROM	visit_logs;
 
 
 
---Let's create view that returns monthly count of visits by each users
-CREATE VIEW cnt_of_monthly_user_visits AS
-SELECT   Cust_ID,
-		 YEAR(Order_Date) AS Years,
-		 MONTH(Order_Date) AS Months,
-		 COUNT(Ord_ID) AS cnt_of_orders
-FROM	 e_commerce_data
-GROUP BY Cust_ID,YEAR(Order_Date),
-		 MONTH(Order_Date);
+--3. For each visit of customers, create the next/prevois month of the visit as a separate column.
+SELECT	*,
+	LAG(current_month) OVER(PARTITION BY Cust_ID ORDER BY current_month) AS prev_month
+FROM(	
+	SELECT	DISTINCT *,
+			DENSE_RANK() OVER(ORDER BY Years, Months) AS current_month
+	FROM	visit_logs
+	) AS subq
 
 
---Let's run this view:
-SELECT	*
-FROM	cnt_of_monthly_user_visits;
-
-
-
---3. For each visit of customers, create the next month of the visit as a separate column.
+--SOLUTION 2 (BENIM COZUMUM) --
 
 SELECT	DISTINCT Ord_ID,
 		Cust_ID, 
@@ -180,9 +175,21 @@ FROM   (SELECT	DISTINCT Ord_ID,
 
 --4. Calculate the monthly time gap between two consecutive visits by each customer.
 
+CREATE VIEW time_gaps AS
+SELECT	*,
+	LAG(current_month) OVER(PARTITION BY Cust_ID ORDER BY current_month) AS prev_month,
+	current_month - LAG(current_month) OVER(PARTITION BY Cust_ID ORDER BY current_month) AS time_gap
+FROM(	
+	SELECT	DISTINCT *,
+			DENSE_RANK() OVER(ORDER BY Years, Months) AS current_month
+	FROM	visit_logs
+	) AS subq
 
-SELECT	DISTINCT Ord_ID,
-		Cust_ID, 
+
+-- SOLUTION 2 -- (BENIM COZUMUM)
+
+SELECT	DISTINCT Cust_ID,
+		Ord_ID, 
 		Order_Date,
 		LEAD(Order_Date) OVER(PARTITION BY Cust_ID ORDER BY Order_Date ) AS next_month,
 		DATEDIFF(MONTH, Order_Date,LEAD(Order_Date) OVER(PARTITION BY Cust_ID ORDER BY Order_Date )) AS month_diff
@@ -190,11 +197,29 @@ FROM   (SELECT	DISTINCT Ord_ID,
 				Cust_ID, 
 				Order_Date
 		FROM	e_commerce_data) AS subq
+ORDER BY 1
 
 
 
 --5. Categorise customers using average time gaps. Choose the most fitted labeling model for you.
 
+--SOLUTION 1 -- 
+
+SELECT Cust_ID, AVG(time_gap) avg_time_gap, COUNT(*) num_of_visits,
+	CASE
+		WHEN AVG(time_gap) IS NULL THEN 'CHURN'
+		WHEN AVG(time_gap) < 4 AND COUNT(*) > 8 THEN 'LOYAL'
+		WHEN COUNT(*) > 8 THEN 'REGULAR'
+		WHEN AVG(time_gap) < 8 AND COUNT(*) > 5 THEN 'NEED ATTENTION'
+		ELSE 'IRREGULAR'
+	END cust_segmentation
+FROM time_gaps
+GROUP BY Cust_ID
+ORDER BY cust_segmentation DESC;
+
+
+
+--SOLUTION 2 -- (BENIM COZUMUM)
 --Let's create view that keeps customers' average time gaps
 
 CREATE VIEW customer_retention AS
@@ -239,41 +264,34 @@ ORDER BY 1;
 
 -- Month-Wise Retention Rate = 1.0 * Number of Customers Retained in The Current Month / Total Number of Customers in the Current Month
 
-
---Let's find total Number of customers by months
-
-SELECT	YEAR(Order_Date) AS "Year",
-		MONTH(Order_Date) AS "Month",
-		COUNT(DISTINCT Cust_ID) AS cnt_customers
-FROM	e_commerce_data
-GROUP BY YEAR(Order_Date),
-		 MONTH(Order_Date);
-
---Let's find number of Customers Retained in The Current Month
-
---I am stuck here. No time :( 
---Süre icerisinde bitrebildigim bu kadari. Projeyi yapmaya devam edeceim. projenin guncel halini paylasmis oldugum github linkinde bulabilirsiniz.
 SELECT	*
-FROM	(
-		SELECT	YEAR(Order_Date) AS "Year",
-				MONTH(Order_Date) AS "Month",
-				COUNT(DISTINCT Cust_ID) AS retained_customers
-		FROM	e_commerce_data
-		GROUP BY YEAR(Order_Date),
-				 MONTH(Order_Date)
-		) as a
-PIVOT
-	(
-	COUNT(Cust_ID)
-	FOR "Month" IN ([1], [2], [3], [4],[5], [6], [7], [8],[9], [10], [11], [12])
-	) AS pivot_table
+FROM	time_gaps;
+
+-- SOLUTION 1 --
+
+SELECT	current_month, 
+		COUNT(Cust_ID) AS num_of_cust,
+		SUM(CASE WHEN time_gap = 1 THEN 1 END) retained_customers,
+		CAST( 1.0 * SUM(CASE WHEN time_gap = 1 THEN 1 END) / (SELECT COUNT(Cust_ID) FROM time_gaps WHERE current_month = a.current_month - 1 ) AS DEC(10,2)) AS retained_rate
+FROM	time_gaps AS a
+GROUP BY current_month
+ORDER BY current_month;
 
 
---I am stuck here :( 
+-- SOLUTION 2 --(with LAG)
 
 
-SELECT	*
-FROM	e_commerce_data
-
-
-
+SELECT	*,
+	CAST(1.0 * retained_customers / prev_cust AS decimal(10,2)) retention_rate
+FROM(
+	SELECT	*,
+		LAG(num_of_cust) OVER(ORDER BY current_month) AS prev_cust
+	FROM(
+		SELECT	current_month, 
+				COUNT(Cust_ID) AS num_of_cust,
+				SUM(CASE WHEN time_gap = 1 THEN 1 END) retained_customers
+		FROM	time_gaps AS a
+		GROUP BY current_month
+		--ORDER BY current_month
+	) subq1
+) subq2;
