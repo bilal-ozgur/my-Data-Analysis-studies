@@ -1,5 +1,5 @@
 ﻿
--- SQL Session-6, RECAP, 12.07.2023
+-- SQL Session-6, RECAP
 --------------------------------------------
 
 --QUESTION-1
