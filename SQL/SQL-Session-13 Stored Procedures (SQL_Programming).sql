@@ -3,6 +3,7 @@ USE SampleRetail
 SELECT * FROM [dbo].[ORDER_DELIVERY]
 
 
+-- LET'S CREATE 2 PROCEDURES
 -- 2 TANE PROCEDURE OLUSTURALIM
 
 -- 1
@@ -268,3 +269,108 @@ FROM	 ORDER_TBL
 
 -- Create a function that converts the first letter of a string to uppercase and all other letters to lowercase.
 -- (Aldigi stringin bas harfini buyuk, digerlerini kucuk harfe donusturen bir fonksiyon uretin.)
+
+SELECT UPPER( LEFT('CLARUSWAY',1 )) + LOWER( SUBSTRING('CLARUSWAY', 2, LEN('CLARUSWAY') ) )
+
+CREATE FUNCTION sp_string (@STRING VARCHAR(100))
+RETURNS VARCHAR (100)
+AS
+BEGIN
+	RETURN UPPER( LEFT(@STRING,1 )) + LOWER( SUBSTRING(@STRING, 2, LEN(@STRING) ) )
+END;
+
+SELECT dbo.sp_string ('biLAL')
+
+-- (Let's write delivery status query above with functions )
+-- Yukarida ki siparis teslimat zamani ile alakali yazdigimiz queryi function ile yazalim:
+;GO
+CREATE FUNCTION fn_order_status ( @ORDER INT )
+RETURNS VARCHAR(25)
+AS
+BEGIN
+	DECLARE @EST_DEL_DATE DATE
+	DECLARE @DEL_DATE DATE
+	DECLARE @STATUS NVARCHAR(50)
+
+	SELECT @EST_DEL_DATE = EST_DELIVERY_DATE
+	FROM ORDER_TBL
+	WHERE ORDER_ID = @ORDER
+
+	SELECT @DEL_DATE = DELIVERY_DATE
+	FROM ORDER_DELIVERY
+	WHERE ORDER_ID = @ORDER
+
+
+	IF @EST_DEL_DATE = @DEL_DATE
+		 SET @STATUS = 'ON TIME'
+	ELSE IF @EST_DEL_DATE > @DEL_DATE
+		 SET @STATUS = 'EARLY'
+	ELSE 
+		 SET @STATUS = 'LATE'
+RETURN @STATUS
+END;
+
+SELECT * FROM ORDER_TBL A, ORDER_DELIVERY B
+WHERE A.ORDER_ID = B.ORDER_ID
+
+SELECT dbo.fn_order_status(3)
+
+
+-- Table Valued Functions
+
+CREATE FUNCTION fn_table_valued_1()
+RETURNS TABLE
+AS
+RETURN
+	SELECT	*
+	FROM	ORDER_TBL
+	WHERE	ORDER_DATE < '2024-07-03'
+	
+-- How to return Table Valued Function:
+-- (Table Valued Function nasil cagrilir:)
+
+SELECT * FROM dbo.fn_table_valued_1()
+
+
+-- With parameter
+
+CREATE FUNCTION fn_table_valued_2( @DATE DATE)
+RETURNS TABLE
+AS
+RETURN
+	SELECT	*
+	FROM	ORDER_TBL
+	WHERE	ORDER_DATE < @DATE
+
+
+SELECT * FROM dbo.fn_table_valued_2 ('2024-07-03')
+
+-- We can temporarily create a table-valued function variable: 
+-- ( Gecici olarak tablo donen bir talo degiskeni olusturabiliriz: )
+
+DECLARE @TABLE1 TABLE (ID INT, NAME VARCHAR (25))
+
+INSERT @TABLE1 VALUES (1, 'Ahmet')
+
+SELECT * FROM @TABLE1
+
+-- We can also temporarily create a scaler-valued function variable: 
+-- ( Gecici olarak tek bir deger donen bir degisken olusturabiliriz: )
+
+CREATE FUNCTION fn_table_valued_3 (@ORDER INT)
+RETURNS @TABLE TABLE (ID INT , NAME VARCHAR (25))
+AS
+BEGIN
+	
+	INSERT		@TABLE
+	SELECT	 CUSTOMER_ID, CUSTOMER_NAME
+	FROM	 ORDER_TBL
+	WHERE	 dbo.fn_order_status(@ORDER) = 'ON TIME'
+	AND		 ORDER_ID = @ORDER
+
+RETURN
+END;
+
+
+SELECT *
+FROM dbo.fn_table_valued_3 (2)
